@@ -4,7 +4,7 @@
 
 # from pathlib import Path
 # from Sentinel_IO import SentinelIOClient
-from RasterData import S1_RasterData, get_time_stamp_from_filename
+from RasterData import get_time_stamp_from_filename
 # from EOPatch import DataPatch
 # from geometry import point_in_bounding_box
 from eolearn.core import FeatureType, EOPatch

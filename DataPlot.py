@@ -1,3 +1,5 @@
+from os import remove
+
 import rasterio
 import rasterio.plot as rplot
 import matplotlib.pyplot as pyplot
@@ -24,8 +26,71 @@ def show_histogram_plot(file_name, bins=50, histtype='stepfilled', lw=0.0, stack
         pyplot.show()
 
 
-def show_rgb_from_tiff(file_name, cmap='greys'):
+def show_rgb_from_tiff(file_name, cmap='pink'):
     file_path = file_name + '.tiff'
     fig = pyplot.figure()
     with rasterio.open(file_path) as src:
         rplot.show(src, cmap=cmap)
+
+
+def compare_tiff_files(file_list: list(), titles=None, cmap='pink'):
+    n_files = len(file_list)
+    if n_files <= 3:
+        n_cols = n_files
+        n_rows = 1
+    else:
+        n_cols = 3
+        n_rows = int(n_files / n_cols + 1)
+
+    fig, axs = pyplot.subplots(n_rows, n_cols)
+
+    i_row, i_col = 1, 1
+    for i_plot in range(len(file_list)):
+        ax_plt_obj = pyplot.subplot(int(''.join([str(arg) for arg in [n_rows, n_cols, i_plot+1]])))
+        if titles:
+            title = titles[i_plot]
+        else:
+            title = file_list[i_plot].split('/')[-1]
+
+        with rasterio.open(file_list[i_plot]+'.tiff') as src:
+            rplot.show(src, ax=ax_plt_obj, transform=src.transform, cmap=cmap, title=title)
+
+        i_col += 1
+        if i_plot == n_cols:
+            i_row += 1
+            i_col = 0
+
+    pyplot.show()
+
+
+def plot_data_array(array_2D, x_min=None, x_max=None, y_min=None, y_max=None, cmap='pink'):
+    pyplot.imshow(array_2D)
+    pyplot.show()
+
+
+def true_color_img(r_band, g_band, b_band, crs:str, transform, dtype, show=True, save=False, cmap='pink'):
+
+    if save:
+        file_name = save
+    else:
+        file_name = 'temp_true_colour.tiff'
+
+    height, width = r_band.shape
+
+    with rasterio.open(file_name, 'w', driver='Gtiff',
+                       width=width, height=height, dtype=dtype,
+                       count=3, crs=crs, transform=transform) as true_color_img:
+
+        print('Creating .tiff-file...')
+        true_color_img.write(r_band, 1)  # red
+        true_color_img.write(g_band, 2)  # green
+        true_color_img.write(b_band, 3)  # blue
+
+    if show:
+        print('Reading .tiff-file for plotting...')
+        fig = pyplot.figure()
+        src = rasterio.open(file_name)
+        rplot.show(src, transform=transform, cmap=cmap)
+
+    if not save:
+        remove(file_name)
