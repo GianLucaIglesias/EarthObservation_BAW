@@ -14,13 +14,11 @@ Module implementing geometry classes
 """
 from abc import ABC, abstractmethod
 from math import ceil
+from sentinelhub import CRS, transform_point
 
 import shapely.geometry
 import shapely.ops
 import shapely.wkt
-
-from sentinelhub import CRS, transform_point
-# from .geo_utils import transform_point
 
 
 def inside_counter_clockwise_edges(bound1, bound2, point):

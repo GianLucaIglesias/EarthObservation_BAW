@@ -2,15 +2,11 @@
 #
 # start(r'/TomoSAR_tutorial.ipynb')
 
-# from pathlib import Path
-# from Sentinel_IO import SentinelIOClient
-from RasterData import get_time_stamp_from_filename
-# from EOPatch import DataPatch
-# from geometry import point_in_bounding_box
-from eolearn.core import FeatureType, EOPatch
-from EOPatch_IO import ImportFromTiffTask, ImportTimeFeatureFromTiffTask
+from sentinel_io_utils import get_time_stamp_from_filename
+from eolearn.core import EOPatch
+from EOPatch_IO import ImportTimeFeatureFromTiffTask
 from sentinelhub.geometry import BBox, CRS
-from DataPlot import plot_data_array, true_color_img, show_rgb_from_tiff
+from DataPlot import plot_data_array, true_color_img
 
 from numpy import sqrt
 
@@ -49,17 +45,23 @@ patch_self.set_bbox(monsterloch_bounding_box)
 # patch = ImportFromTiffTask(('data', 'amplitudes_vh'), folder=r'C:\Users\gian_\Desktop\Masterarbeit\CODE-DE\L2A_TrueColor_L2A_Monsterloch.tiff').execute(eopatch=patch)
 
 # patch = ImportTimeFeatureFromTiffTask(feature=('data', 'band02'), timestamp=time_stamp).execute(eopatch=patch, file_name=bigS2_scene, time_stamps=time_stamp)
-# patch = ImportTimeFeatureFromTiffTask(feature=('data', 'CLD'),
-#                                       path=cloud_filesystem,
-#                                       timestamp=time_stamp).execute(eopatch=patch,
+# patch_self = ImportTimeFeatureFromTiffTask(feature=('data', 'CLD'),
+#                                       folder=cloud_filesystem,
+#                                       timestamp=time_stamp).execute(eopatch=patch_self,
 #                                                                     file_name=r'CLD.tif',
 #                                                                     time_stamps=time_stamp)
 
-# patch_self = ImportTimeFeatureFromTiffTask(feature=('data', 'bands'),
-#                                       folder=r'C:\Users\gian_\Desktop\Masterarbeit\CODE-DE',
-#                                       timestamp=time_stamp).execute(eopatch=patch_self,
-#                                                                     file_name='TrueColor_L2A.tiff',
-#                                                                     time_stamps=time_stamp)
+patch_self = ImportTimeFeatureFromTiffTask(feature=('data', 'bands'),
+                                      folder=r'C:\Users\gian_\Desktop\Masterarbeit\CODE-DE',
+                                      timestamp=time_stamp).execute(eopatch=patch_self,
+                                                                    file_name='TrueColor_L2A.tiff',
+                                                                    time_stamps=time_stamp)
+
+true_color_img(r_band=patch_self.data['bands'][0, :, :, 0],
+               g_band=patch_self.data['bands'][0, :, :, 1],
+               b_band=patch_self.data['bands'][0, :, :, 2],
+               crs=str(patch_self.bbox.crs), transform=patch_self.meta_info['transform'], dtype=patch_self.data['bands'].dtype)
+
 
 # patch_orig = ImportFromTiffTask(feature=('data', 'bands'),
 #                                 folder=r'C:\Users\gian_\Desktop\Masterarbeit\CODE-DE').execute(eopatch=patch_orig,
@@ -72,14 +74,5 @@ patch_self = ImportTimeFeatureFromTiffTask(feature=('data', 'amplitudes_vh'), fo
             manifest_file=r'D:\SAR\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B.SAFE\manifest.safe')
 
 # patch = ImportTimeFeatureFromTiffTask(feature=('data', 'amplitudes_vv'), path=r'D:\SAR\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B.SAFE\measurement').execute(eopatch=patch, file_name=r's1a-iw-grd-vv-20210927t053448-20210927t053513-039863-04b74d-001.tiff', time_stamps=time_stamp)
-# weiter machen: fix the coordinate system
-# true_color_img(r_band=patch_self.data['bands'][0, :, :, 0],
-#                g_band=patch_self.data['bands'][0, :, :, 1],
-#                b_band=patch_self.data['bands'][0, :, :, 2],
-#                crs=str(patch_self.bbox.crs), transform=patch_self.meta_info['transform'], dtype=patch_self.data['bands'].dtype)
 
-blub = 1
-
-
-
-
+plot_data_array(patch_self.data['amplitudes_vh'][0, :, :, 0])

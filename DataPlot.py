@@ -80,17 +80,13 @@ def true_color_img(r_band, g_band, b_band, crs:str, transform, dtype, show=True,
     with rasterio.open(file_name, 'w', driver='Gtiff',
                        width=width, height=height, dtype=dtype,
                        count=3, crs=crs, transform=transform) as true_color_img:
-
-        print('Creating .tiff-file...')
         true_color_img.write(r_band, 1)  # red
         true_color_img.write(g_band, 2)  # green
         true_color_img.write(b_band, 3)  # blue
 
     if show:
-        print('Reading .tiff-file for plotting...')
-        fig = pyplot.figure()
-        src = rasterio.open(file_name)
-        rplot.show(src, transform=transform, cmap=cmap)
+        with rasterio.open(file_name) as src:
+            rplot.show(src, transform=transform, cmap=cmap)
 
     if not save:
         remove(file_name)

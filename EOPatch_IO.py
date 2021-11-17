@@ -11,22 +11,17 @@ Copyright (c) 2019 Drew Bollinger (DevelopmentSeed)
 This source code is licensed under the MIT license found in the LICENSE
 file in the root directory of this source tree.
 """
-import datetime
 import logging
-import warnings
-from abc import abstractmethod
-import dateutil
 import fs
 import rasterio
 import numpy as np
+
+from abc import abstractmethod
 from sentinelhub import CRS, BBox
-from pyproj import Proj, transform
-
-
-from RasterData import get_footprint_from_manifest
+from pyproj import Transformer
+from sentinel_io_utils import get_footprint_from_gcps
 from eolearn.core import EOTask, EOPatch
 from filesystem_utils import get_base_filesystem_and_path
-# from eolearn.core.utilities import renamed_and_deprecated
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,14 +33,27 @@ def get_distance_point_to_line(A: tuple, B: tuple, P: tuple):
 
 
 def get_window(upper_left: tuple, bottom_right: tuple, crs_transform, ref_crs='epsg:4326', out_crs='epsg:32632'):
-    print('Transforming window...')
-    in_proj = Proj(ref_crs)
-    out_proj = Proj(out_crs)
-    x_up, y_up = transform(in_proj, out_proj, upper_left[0], upper_left[1])
-    x_bottom, y_bottom = transform(in_proj, out_proj, bottom_right[0], bottom_right[1])
+    """ Retrieve the rasterio window offset for bounds of a bounding box which is assumed to be aligned with the
+    coordinate axis.
 
-    return rasterio.windows.from_bounds(left=x_up, bottom=y_bottom, right=x_bottom, top=y_up,
-                                            transform=crs_transform)
+    :param upper_left: bound of the bounding box
+    :type upper_left: tuple (first entry latitude, second entry altitude)
+    :param bottom_right: bound of the bounding box
+    :type bottom_right: tuple (first entry latitude, second entry altitude)
+    :param crs_transform:
+    :type crs_transform: Rasterio.transform. transform
+    """
+    if not ref_crs == out_crs:
+        transformer = Transformer.from_crs(crs_from=ref_crs, crs_to=out_crs)
+
+        x_ul, y_ul = transformer.transform(upper_left[0], upper_left[1])
+        x_lr, y_lr = transformer.transform(bottom_right[0], bottom_right[1])
+
+    else:
+        x_ul, y_ul = upper_left
+        x_lr, y_lr = bottom_right
+
+    return rasterio.windows.from_bounds(left=x_lr, bottom=y_ul, right=x_ul, top=y_lr, transform=crs_transform)
 
 
 class AddFeatureTask(EOTask):
@@ -314,8 +322,8 @@ class ImportFromTiffTask(BaseLocalIoTask):
         for gcp in gcps[0]:
             if gcp.col == 0 and gcp.row == 0:
                 upper_right = (gcp.y, gcp.x)
-            # elif gcp.col == 0 and gcp.row == height - 1:
-            #     lower_right = (gcp.y, gcp.x)
+            elif gcp.col == 0 and gcp.row == height - 1:
+                lower_right = (gcp.y, gcp.x)
             elif gcp.col == width - 1 and gcp.row == 0:
                 upper_left = (gcp.y, gcp.x)
             elif gcp.col == width-1 and gcp.row == height - 1:
@@ -437,38 +445,52 @@ class ImportTimeFeatureFromTiffTask(ImportFromTiffTask):
             for path in filename_paths:
                 with filesystem.openbin(path, 'r') as file_handle:
                     with rasterio.open(file_handle, driver='Gtiff') as src:
-                        if not src.crs:  # as common for GRD Sentinel-1 data
+                        if not src.crs:  # as common for not georeferenced GRD Sentinel-1 data
                             if not manifest_file:
                                 raise ValueError(f"The given tiff-file {path} (at: {filesystem.root_path})does not "
                                                  f"feature any reference bounding box. Please state a manifest file.")
 
-                            data_footprint = get_footprint_from_manifest(manifest_file.rstrip('manifest.safe')+'\\manifest.safe')
-
-
-                            # data_bbox = data_footprint.bbox
-                            # exploit the array edges from the src.gcps[0][0], so to define the data_bbox
-                            data_bbox = BBox(..., src.gcps[1])
                             data_crs = str(src.gcps[1])
+                            data_footprint = get_footprint_from_gcps(src.height, src.width, src.gcps[0], data_crs)
+                            data_bbox = data_footprint.bbox
+
                             data_transform = rasterio.transform.from_gcps(src.gcps[0])
 
-                        else:
+                            data_ul_y, data_lr_x = eopatch.bbox.lower_left
+                            data_lr_y, data_ul_x = eopatch.bbox.upper_right
+
+                            read_window = get_window(upper_left=(data_lr_x, data_ul_y),
+                                                     bottom_right=(data_ul_x, data_lr_y),
+                                                     crs_transform=data_transform,
+                                                     ref_crs=str(eopatch.bbox.crs), out_crs=data_crs)
+
+                            try:  # execute src.read throws an error due to failed Proj definition
+                                scene_data = src.read(window=read_window, boundless=True, fill_value=999)
+                            except rasterio._err.CPLE_AppDefinedError:
+                                scene_data = src.read(window=read_window, boundless=True, fill_value=999)
+
+                            scene_data = np.flip(scene_data, 2)  # flipping needed for GRD S1 data!
+
+                        else:  # S2 Data
                             data_bbox = BBox(src.bounds, CRS(src.crs.to_epsg()))
                             data_crs = str(src.crs)
                             data_transform = src.transform
 
+                            data_ul_x, data_lr_y = eopatch.bbox.lower_left
+                            data_lr_x, data_ul_y = eopatch.bbox.upper_right
+
+                            read_window = get_window(upper_left=(data_ul_x, data_ul_y),
+                                                     bottom_right=(data_lr_x, data_lr_y),
+                                                     crs_transform=data_transform,
+                                                     ref_crs=str(eopatch.bbox.crs), out_crs=data_crs)
+
+                            scene_data = src.read(window=read_window, boundless=True,
+                                                  fill_value=999)  # self.no_data_value)
+
                         if eopatch.bbox is None:
                             eopatch.bbox = data_bbox
 
-                        data_ul_x, data_lr_y = eopatch.bbox.lower_left
-                        data_lr_x, data_ul_y = eopatch.bbox.upper_right
-
-                        read_window = get_window((data_lr_x, data_lr_y), (data_ul_x, data_ul_y),
-                                                 crs_transform=data_transform,
-                                                 ref_crs=str(eopatch.bbox.crs), out_crs=data_crs)
-
                         eopatch.meta_info['transform'] = data_transform
-
-                        scene_data = src.read(window=read_window, boundless=True, fill_value=self.no_data_value)
 
         # scene_data = np.concatenate(scene_data, axis=0)
 
@@ -479,13 +501,10 @@ class ImportTimeFeatureFromTiffTask(ImportFromTiffTask):
             scene_data = scene_data.flatten()  # flatten 2d array into one single axis
 
         if feature_type.is_timeless():
-            scene_data = np.moveaxis(scene_data, 0, -1)  # moves the first axis one to the back
+            data = np.moveaxis(scene_data, 0, -1)  # moves the first axis one to the back
         else:
             channels = scene_data.shape[0]
 
-            # times = self.timestamp_size
-            # if times is None:
-                # times = len(eopatch.timestamp) if eopatch.timestamp else 1
             times = len(time_stamps)
             if times == 0:
                 times = len(time_stamps) if time_stamps else 1
@@ -497,8 +516,8 @@ class ImportTimeFeatureFromTiffTask(ImportFromTiffTask):
             data = scene_data.reshape((times, channels // times) + scene_data.shape[1:])
             data = np.moveaxis(data, 1, -1)
 
-            eopatch[feature_type][feature_name] = data
-            for i in range(times):
-                eopatch.timestamp.append(time_stamps[i])
+        eopatch[feature_type][feature_name] = data
+        for i in range(times):
+            eopatch.timestamp.append(time_stamps[i])
 
         return eopatch
