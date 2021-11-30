@@ -52,8 +52,16 @@ def compare_tiff_files(file_list: list(), titles=None, cmap='pink'):
         else:
             title = file_list[i_plot].split('/')[-1]
 
-        with rasterio.open(file_list[i_plot]+'.tiff') as src:
-            rplot.show(src, ax=ax_plt_obj, transform=src.transform, cmap=cmap, title=title)
+        try:
+            with rasterio.open(file_list[i_plot].rstrip('.tif')+'.tiff') as src:
+                rplot.show(src, ax=ax_plt_obj, transform=src.transform, cmap=cmap, title=title)
+        except rasterio.errors.RasterioIOError:
+            try:
+                with rasterio.open(file_list[i_plot].rstrip('.tif')+'.tif') as src:
+                    rplot.show(src, ax=ax_plt_obj, transform=src.transform, cmap=cmap, title=title)
+            except rasterio.errors.RasterioIOError as err:
+                raise err
+
 
         i_col += 1
         if i_plot == n_cols:
@@ -90,3 +98,44 @@ def true_color_img(r_band, g_band, b_band, crs:str, transform, dtype, show=True,
 
     if not save:
         remove(file_name)
+
+
+def plot_pegel(pegel, save=False, station_name=None, title=None):
+    # find x tick subset
+    time_stamps = pegel['timestamp']
+    pegel_values = pegel['Wasserstand [m ü.NN]']
+
+    if len(time_stamps) > 15:
+        for i in range(len(time_stamps)):
+            day = time_stamps[i][0:10]
+            hour = time_stamps[i][-14:-9]
+
+            if not 'days' in locals():
+                days = [(day, i)]
+                hours = [(hour, i)]
+            elif day != days[-1][0]:
+                days.append((day, i))
+
+            if hour != hours[-1][0] and hour[-2:] == '00':
+                hours.append((hour, i))
+
+    if len(days) > 1:
+        xticks = [day[0] for day in days[:]]
+        xtick_loc = [day[1] for day in days[:]]
+    else:
+        xticks = [hour[0] for hour in hours[:]]
+        xtick_loc = [hour[1] for hour in hours[:]]
+    fig = pyplot.figure()
+    if station_name:
+        fig.suptitle(f"Pegel: {station_name} from {time_stamps[0][:-9]} to {time_stamps[-1][:-9]}")
+    pyplot.plot(time_stamps, pegel_values, 'rs')
+    pyplot.xticks(xtick_loc, xticks, rotation=90)
+    pyplot.xlabel(pegel.columns[0])
+    pyplot.ylabel(pegel.columns[1])
+
+    pyplot.tight_layout()
+    pyplot.show()
+
+    if save:
+        file_name = save
+        pyplot.savefig(file_name.rstrip('.png') + '.png')

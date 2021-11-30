@@ -13,7 +13,7 @@ HOST = 'http://data.cloud.code-de.org'
 BUCKET = 'CODEDE'
 
 
-class SentinelIOClient():
+class SentinelIOClient:
     def __init__(self, access_key, secret_key):
         self.ACCESS_KEY = access_key
         self.SECRET_KEY = secret_key
