@@ -20,7 +20,7 @@ from abc import abstractmethod
 from sentinelhub import CRS, BBox
 from pyproj import Transformer
 from sentinel_io_utils import get_footprint_from_gcps
-from eolearn.core import EOTask, EOPatch
+from eolearn.core import EOTask, EOPatch, FeatureType
 from filesystem_utils import get_base_filesystem_and_path
 
 LOGGER = logging.getLogger(__name__)
@@ -399,7 +399,7 @@ class ImportFromTiffTask(BaseLocalIoTask):
 
 class ImportTimeFeatureFromTiffTask(ImportFromTiffTask):
     """ Adds a raster scene to the specified data feature array."""
-    def __init__(self, feature, folder=None, **kwargs):
+    def __init__(self, data_feature, folder=None, **kwargs):
         """
         :param data_feature: Feature to which the data will be added to
         :type data_feature: (FeatureType, str)
@@ -419,6 +419,7 @@ class ImportTimeFeatureFromTiffTask(ImportFromTiffTask):
         :type config: SHConfig or None
         """
         self.kwargs = kwargs
+        feature = (FeatureType.DATA, data_feature)
         super().__init__(feature=feature, folder=folder)
 
     def execute(self, file_name, time_stamps, eopatch=None, manifest_file=None):
@@ -436,10 +437,13 @@ class ImportTimeFeatureFromTiffTask(ImportFromTiffTask):
         :rtype: EOPatch
         """
         feature_type, feature_name = next(self.feature())
-        if eopatch is None:
-            eopatch = EOPatch()
 
-        filesystem, filename_paths = self._get_filesystem_and_paths(file_name, eopatch.timestamp, create_paths=False)
+        if eopatch.timestamp:
+            time_stamps = eopatch.timestamp
+
+        filesystem, filename_paths = self._get_filesystem_and_paths(file_name, time_stamps, create_paths=False)
+
+
 
         with filesystem:
             for path in filename_paths:
@@ -455,6 +459,9 @@ class ImportTimeFeatureFromTiffTask(ImportFromTiffTask):
                             data_bbox = data_footprint.bbox
 
                             data_transform = rasterio.transform.from_gcps(src.gcps[0])
+
+                            if not eopatch.bbox:
+                                eopatch.bbox = data_bbox
 
                             data_ul_y, data_lr_x = eopatch.bbox.lower_left
                             data_lr_y, data_ul_x = eopatch.bbox.upper_right

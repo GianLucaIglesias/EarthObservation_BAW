@@ -1,8 +1,9 @@
-# from sentinel_io_utils import get_time_stamp_from_filename
-# from eolearn.core import EOPatch
-# from EOPatch_IO import ImportTimeFeatureFromTiffTask
-# from sentinelhub.geometry import BBox, CRS
-# from DataPlot import plot_data_array, true_color_img, compare_tiff_files
+from sentinel_io_utils import get_time_stamp_from_filename
+from eolearn.core import EOPatch, FeatureType
+from EOPatch_IO import ImportTimeFeatureFromTiffTask
+from sentinelhub.geometry import BBox, CRS
+
+from DataPlot import plot_data_array, true_color_img, compare_tiff_files
 
 # from numpy import sqrt
 
@@ -12,24 +13,51 @@
 #
 # print("Available applications : ")
 # print(str(otb.Registry.GetAvailableApplications()))
+#
+# SAR_folder = r"D:\SAR\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B.SAFE\measurement"
+#
+# time_stamp = get_time_stamp_from_filename(SAR_folder)
+# upper_left = (49.34067, 8.41330)
+# bottom_right = (49.26702, 8.50788)
+# monsterloch = BBox([upper_left, bottom_right], crs=CRS('4263'))
+#
+# feature_name = 'vv_amplitudes'
+#
+# patch = EOPatch()
+# patch.set_bbox(monsterloch)
+# patch = ImportTimeFeatureFromTiffTask(data_feature=feature_name, folder=SAR_folder).execute(file_name=r"s1a-iw-grd-vv-20210927t053448-20210927t053513-039863-04b74d-001.tiff",
+#                                                                                  time_stamps=[time_stamp],
+#                                                                                  manifest_file=r"..\manifest.safe",
+#                                                                                  eopatch=patch)
+#
+#
+# print(f"The patch data is of size: {patch.data[feature_name].shape}")
+#
+# plot_data_array(patch.data[feature_name][0, :, :, 0], save=r'sar_test_tif.tiff', crs=str(patch.bbox.crs),
+#                 transform=patch.meta_info['transform'], dtype=patch.data[feature_name].dtype)
 
-# from Pegel_IO import PegelIO
-# from DataPlot import plot_pegel
-#
-# pegel = PegelIO('speyer')
-# pegel_speyer = pegel.load_pegel_for_station(start='2021-11-10T13:15:00+01:00', end="2021-11-25T08:15:00+01:00")
-#
+
+
+
+
+# PEGEL - SECTION
+
+from Pegel_IO import PegelIO
+from DataPlot import plot_pegel
+
+pegel = PegelIO('speyer')
+# pegel_speyer = pegel.load_pegel_for_station(start='2021-12-13T09:15:00+01:00', end="2021-12-18T08:15:00+01:00")
+
 # pegel_speyer = pegel.load_pegel_for_station(start='P8D')
-# # current_speyer = pegel.load_current_for_station(start='P15D')
-#
-# # gauging_station = pegel.find_station_around_coordinates(longitude=13.57, latitude=52.44, radius=20, show=True)
-# # gauging_stations_rhein = pegel.find_station_along_river('saale', show=True)
-#
-# plot_pegel(pegel_speyer, save='Pegel Speyer')
+# current_speyer = pegel.load_current_for_station(start='P15D')
 
-from snappy import ProductIO
+# gauging_station = pegel.find_station_around_coordinates(longitude=13.57, latitude=52.44, radius=20, show=True)
+# gauging_stations_rhein = pegel.find_station_along_river('saale', show=True)
 
-# p = ProductIO.readProduct(r'C:\Users\gian_\Desktop\Masterarbeit\CODE-DE\L2A_TrueColor_L2A_Monsterloch.tiff')
+# plot_pegel(pegel_speyer, save=False)
+
+
+
 
 
 
@@ -60,8 +88,6 @@ cloud_file = r'CLD.tif'
 
 #
 # app = otb.Registry.CreateApplication("Smoothing")
-
-blub = 1
 
 # speckle = r"D:\SAR\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B.SAFE\measurement\s1a-iw-grd-vv-20210927t053448-20210927t053513-039863-04b74d-001.tiff"
 # de_speckle = r"C:/Users/gian_/Desktop/Despeckle_s1a-iw-grd-vv-20210927t053448-20210927t053513-039863-04b74d-001.tif".replace('/', '\\')

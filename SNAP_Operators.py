@@ -53,13 +53,8 @@ def append_dict_to_xml_subelement(parent_element: ET.Element, element_tag:str, p
                 else:
                     raise ValueError(f'Could not parse the parameter dictionary due to an unexpected parameter type.')
 
-            current_parameter = head_parameter
+            # current_parameter = head_parameter
             break
-
-
-
-
-
 
 class SNAP_Node:
     def __init__(self, node_id, operator=str(), sources=dict(), parameters=dict()):
@@ -70,6 +65,14 @@ class SNAP_Node:
 
     def __str__(self):
         return str(self.node_id)
+
+    def set_source(self, source: str):  # sets the string an puts it into the respective dict location!
+        source_dict = self.__getattribute__('sources')
+        for key in list(source_dict.keys()):
+            if key in source_dict[key].strip('${}'):
+                source_dict[key] = source
+        self.sources = source_dict
+
 
     def to_xml_element(self):
         """ Creates a node in the xml format for the SNAP Graphical Processing Framework. """
@@ -86,34 +89,27 @@ class SNAP_Node:
 
         return gpf_node
 
-    def execute(self):
-        process = subprocess.Popen(["dir"], shell=True)  # , stdout=subprocess.DEVNULL)
-        print(f"Waiting for the {self.node_id}...")
-        process.wait()
-        if process.returncode == 0:
-            print(f"{self.node_id} done!")
-        else:
-            print(f"Wuuuups, something went wrong! ")
-
-
 class ExtractBand(SNAP_Node):
     def __init__(self, target_band_name, node_id="ExtractBand", expression=str(), description=str(), type='int32',
-                 no_data_value='Nan'):
+                 no_data_value='Nan', sources='${sourceProducts}'):
 
         parameters = {'targetBands': {'targetBand': [('name', target_band_name), ('expression', expression),
                                                      ('description', description), ('type', type),
                                                      ('noDataValue', no_data_value)]}}
-        sources = {'sourceProducts': '${sourceProducts}'}
+
+        sources = {'sourceProducts': sources}
 
         super().__init__(node_id, operator="BandMaths", sources=sources, parameters=parameters)
 
 class Write(SNAP_Node):
     def __init__(self, node_id, file, format_name='GeoTIFF', delete_on_failure=False, write_entire_tile_rows=False,
-                 clear_cache_after_row_write=True):
+                 clear_cache_after_row_write=True, sources='${source}'):
         parameters = [('file', file), ('formatName', str(format_name)),
                       ('deleteOutputOnFailure', str(delete_on_failure)),
                       ('writeEntireTileRows', str(write_entire_tile_rows)),
                       ('clearCacheAfterRowWrite', str(clear_cache_after_row_write))]
-        sources = {'source': '${source}'}
+
+        sources = {'source': sources}
 
         super().__init__(node_id, operator="Write", sources=sources, parameters=parameters)
+

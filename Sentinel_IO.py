@@ -1,16 +1,20 @@
 # import required libraries
 import boto3
 import xml.etree.ElementTree as ET
+import requests
 
 from re import search
 from sentinelhub.geometry import BBox
 from pyproj import Transformer
 from os import remove as remove_file
 from geometry_utils import point_in_bounding_box
+from sentinel_io_utils import API_Error
+from http_api_utils import append_directory, append_search_parameter, append_aoi, append_timestamp, make_url_request
 
 # Define repository
 HOST = 'http://data.cloud.code-de.org'
 BUCKET = 'CODEDE'
+FINDER_API = 'https://finder.code-de.org/resto/api'
 
 
 class SentinelIOClient:
@@ -19,6 +23,54 @@ class SentinelIOClient:
         self.SECRET_KEY = secret_key
         self.aws_client = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key,
                                        endpoint_url=HOST)
+        self.product_list = []
+       # self.selected_keys = None
+
+    # collections/Sentinel2/search.json?maxRecords=10&startDate=2021-12-15T00%3A00%3A00Z&completionDate=2021-12-27T23%3A59%3A59Z&cloudCover=%5B0%2C50%5D&location=all&processingLevel=LEVEL2A&productType=L2A&sortParam=startDate&sortOrder=descending&status=all&geometry=POINT(8.658860249999996+49.16422439932492)&dataset=ESA-DATASET
+    # https://finder.code-de.org/resto/api/collections/Sentinel2/search.json?maxRecords=10&startDate=2022-01-01T00%3A00%3A00Z&completionDate=2022-01-09T23%3A59%3A59Z&cloudCover=%5B0%2C20%5D&location=all&processingLevel=LEVEL2A&productType=L2A&sortParam=startDate&sortOrder=descending&status=all&geometry=POLYGON((8.405333680449916+49.27470166786608%2C8.404257822334488+49.33853552890449%2C8.497319549318995+49.33853552890449%2C8.497857478376709+49.275403588302424%2C8.405333680449916+49.27470166786608))&dataset=ESA-DATASET
+    # https://finder.code-de.org/resto/api/collections/Sentinel2/search.json?maxRecords=10&startDate=2022-01-01T00%3A00%3A00Z&completionDate=2022-01-09T23%3A59%3A59Z&cloudCover=%5B0%2C20%5D&location=all&processingLevel=LEVEL2A&productType=L2A&sortParam=startDate&sortOrder=descending&status=all&geometry=POLYGON((8.433843920508753+49.33187542041324%2C8.48548511004929+49.33222597490638%2C8.488174755337859+49.30417372646539%2C8.437071494855036+49.30627819935006%2C8.433843920508753+49.33187542041324))&dataset=ESA-DATASET
+    def find(self, collection: str, pretty=True, start_date=None, completion_date=None, processing_level=None,
+             aoi=None, show_list=False):
+
+        if '1' in str(collection):
+            collection = 'Sentinel1'
+
+        elif '2' in str(collection):
+            collection = 'Sentinel2'
+            if processing_level == 2:
+                processing_level = 'LEVEL2A'
+        else:
+            raise API_Error('collection', collection)
+
+        finder_URL = append_directory(FINDER_API, ['collections', collection, 'search.json?'])
+
+        # if pretty:
+        #     finder_URL = append_search_parameter(finder_URL, ('_pretty', 'true'))
+
+        if processing_level:
+            finder_URL = append_search_parameter(finder_URL + '&', ('processingLevel', 'LEVEL2A'))
+
+        if start_date or completion_date:
+            finder_URL = append_timestamp(start=start_date, end=completion_date,
+                                          base_url=finder_URL + '&', api='code-de')
+
+        if aoi:
+            if type(aoi) != list and len(aoi) != 2:
+                raise ValueError('The aoi has to be a list of the upper left and bottom right coordinate of a bounding '
+                                 'box. e.g: [(49.34067, 8.41330), (49.26702, 8.50788)]')
+
+            finder_URL = append_aoi(finder_URL + '&', lower_left=aoi[0], upper_right=aoi[1])
+
+        finder_dict = make_url_request(finder_URL).json()
+        if finder_dict['type'] == 'FeatureCollection':
+            for feature in finder_dict['features']:
+                self.product_list.append(feature)
+
+        print(f"Found {len(self.product_list)} products.")
+        if show_list:
+            for feature in self.product_list:
+                print(feature['properties']['productIdentifier'])
+        return
 
     @staticmethod
     def read_feature_from_manifest(manifest_file_path, feature_id='measurementFrameSet', tag='coordinates'):

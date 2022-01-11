@@ -4,10 +4,18 @@ A module implementing utilities for extracting meta information from Sentinel da
 import re
 import xml.etree.ElementTree as ET
 
+
+
 from pathlib import Path
 from datetime import datetime
 from sentinelhub.geometry import CRS, Geometry
 from shapely.geometry.polygon import Polygon
+
+
+class API_Error(Exception):
+    def __init__(self, param_key, param_value):
+        message = f"There is an error finding the {param_key} ({param_value}) in the Finder API."
+        super().__init__(message)
 
 
 def get_time_stamp_from_filename(file_name):

@@ -2,84 +2,10 @@ import requests
 import pandas as pd
 import re
 
-from datetime import datetime
-
+from http_api_utils import dict_from_response_text, make_url_request, append_timestamp
 
 URL_BASE = r"https://www.pegelonline.wsv.de/webservices/rest-api/v2"
 TEST_URL = URL_BASE + r'/stations.json'
-
-
-def make_url_request(url: str):
-    """
-    Function performing an url request. Returns the requests response.
-    :param url: http address from which the information will be requested.
-    :type url: str
-    """
-
-
-    try:
-        response = requests.get(url)
-    except requests.exceptions.ConnectionError:
-        raise ConnectionError('There is no connection to the pegelonline server. Please check your internet '
-                              'connection.')
-
-    if not response.ok:
-        error = dict_from_response_text(response.text)['message']
-        raise ValueError(error)
-    return response
-
-
-def append_timestamp(start=None, end=None, base_url='', measurement_interval='01:00'):
-    """
-    Function parsing the datetime date indications to a string lateral. Appends the date request to the base_url and
-    returns it as a string.
-
-    :param start: start date or iso standard time gauging period
-    :type start: datetime
-    :param end: date to be included as the end time of a time series
-    :type end: datetime
-    :param measurement_interval: 5 lateral string in the format <hh:ss>
-    """
-    if type(start) == datetime and type(end) == datetime:
-        inquiry_url = base_url + '?start'
-        if start:
-            inquiry_url = inquiry_url + start.year + '-' + start.month + '-' + start.day + 'T' + start.hour + ':' \
-                          + start.minute + ':' + start.second + '+' + measurement_interval
-
-        if end:
-            inquiry_url = inquiry_url.rstrip('&end=') + '&end=' + end.year + '-' + end.month + '-' + end.day + 'T' + \
-                          end.hour + ':' + end.minute + ':' + end.second + '+' + measurement_interval
-
-    elif type(start) == str:
-        inquiry_url = base_url + '?start=' + start
-        if type(end) == str:
-            inquiry_url += '&end=' + end
-    elif not start and not end:
-        inquiry_url = base_url
-    else:
-        raise ValueError(f"start and end are expected to follow the same format. Type(start): {type(start)} and "
-                         f"type(end): {type(end)} were given.")
-    return inquiry_url
-
-
-def dict_from_response_text(response_text:str):
-    pattern = r'(?<=\").+?(?=\")'
-    parameter_list = re.findall(pattern, response_text)
-
-    response_dict = dict()
-    i = 0
-    while i < len(parameter_list):
-        if parameter_list[i].strip(':'):
-            key = parameter_list[i].strip(':').strip(',')
-            i += 1
-            while i < len(parameter_list):
-                if parameter_list[i].strip(':'):
-                    value = parameter_list[i].strip(':').strip(',')
-                    break
-                i+=1
-        i+=1
-        response_dict[key] = value
-    return response_dict
 
 
 class PegelIO:
@@ -93,14 +19,13 @@ class PegelIO:
             self.station_name, self.station_nr, coordinates, self.river, self.km = self.load_station(station,
                                                                                                      number=False)
         else:
-            self.station_name, self.station_nr, coordinates, self.river, self.km = None, None, (None,None), None, None
+            self.station_name, self.station_nr, coordinates, self.river, self.km = None, None, (None, None), None, None
 
         self.longitude, self.latitude = coordinates
         self.measurements = None
-        self.measurements_png = None# pd.DataFrame(columns=['timestamp','measurement'])
+        self.measurements_png = None  # pd.DataFrame(columns=['timestamp','measurement'])
         self.current_measurement = None
         self.current_measurement_png = None
-
 
     @staticmethod
     def load_station(station, number=False):
@@ -121,7 +46,8 @@ class PegelIO:
 
         for pegel_station in station_list:
             if pegel_station[id_key].startswith(id_station):
-                print(f"Pegel for {pegel_station[id_key]} has been found.")
+                print(f"Pegel for {pegel_station[id_key]} has been found. "
+                      f"Number: {pegel_station['number']}, Longname: {pegel_station['longname']}, uuid: {pegel_station['uuid']}")
 
                 station_name = pegel_station['shortname']
                 station_number = str(pegel_station['number'])
@@ -172,7 +98,6 @@ class PegelIO:
                 print(stations_list[i]['shortname'])
         return stations_list
 
-
     @staticmethod
     def _load_measurement_from_url(url):
         """
@@ -202,7 +127,7 @@ class PegelIO:
         the end date of the pegel time series
         """
         url = URL_BASE + '/stations/' + self.station_name + r'/W/currentmeasurement.json'
-        url = append_timestamp(start, end, base_url=url)
+        url = append_timestamp(start, end, base_url=url+'?', api='pegel')
 
         df = self._load_measurement_from_url(url)
         self.current_measurement = df.rename({'value': 'Wasserstand [m ü.NN]'}, axis=1)
@@ -219,7 +144,7 @@ class PegelIO:
         the end date of the pegel time series
         """
         url = URL_BASE + '/stations/' + self.station_name + r'/W/measurements.json'
-        url = append_timestamp(start, end, base_url=url)
+        url = append_timestamp(start, end, base_url=url+'?', api='pegel')
         df = self._load_measurement_from_url(url)
         self.measurements = df.rename({'value': 'Wasserstand [m ü.NN]'}, axis=1)
         return self.measurements

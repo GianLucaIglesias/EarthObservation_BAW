@@ -71,9 +71,16 @@ def compare_tiff_files(file_list: list(), titles=None, cmap='pink'):
     pyplot.show()
 
 
-def plot_data_array(array_2D, x_min=None, x_max=None, y_min=None, y_max=None, cmap='pink'):
+def plot_data_array(array_2D, crs:str, transform, dtype, save=False, show=True):
     pyplot.imshow(array_2D)
-    pyplot.show()
+    height, width = array_2D.shape
+    if save:
+        with rasterio.open(save, 'w', driver='Gtiff',
+                           width=width, height=height, dtype=dtype,
+                           count=1, crs=crs, transform=transform) as tiff_img:
+            tiff_img.write(array_2D, 1)
+
+        print(f"Picture saved: {save}")
 
 
 def true_color_img(r_band, g_band, b_band, crs:str, transform, dtype, show=True, save=False, cmap='pink'):
