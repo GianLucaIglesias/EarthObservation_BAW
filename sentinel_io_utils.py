@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 
 from pathlib import Path
 from datetime import datetime
-from sentinelhub.geometry import CRS, Geometry
+from geometry_utils import CRS, Geometry
 from shapely.geometry.polygon import Polygon
 
 

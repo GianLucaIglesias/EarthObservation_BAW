@@ -1,7 +1,7 @@
 # import required libraries
 import boto3
 import xml.etree.ElementTree as ET
-import requests
+import os
 
 from re import search
 from sentinelhub.geometry import BBox
@@ -16,7 +16,6 @@ HOST = 'http://data.cloud.code-de.org'
 BUCKET = 'CODEDE'
 FINDER_API = 'https://finder.code-de.org/resto/api'
 
-
 class SentinelIOClient:
     def __init__(self, access_key, secret_key):
         self.ACCESS_KEY = access_key
@@ -24,11 +23,7 @@ class SentinelIOClient:
         self.aws_client = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key,
                                        endpoint_url=HOST)
         self.product_list = []
-       # self.selected_keys = None
 
-    # collections/Sentinel2/search.json?maxRecords=10&startDate=2021-12-15T00%3A00%3A00Z&completionDate=2021-12-27T23%3A59%3A59Z&cloudCover=%5B0%2C50%5D&location=all&processingLevel=LEVEL2A&productType=L2A&sortParam=startDate&sortOrder=descending&status=all&geometry=POINT(8.658860249999996+49.16422439932492)&dataset=ESA-DATASET
-    # https://finder.code-de.org/resto/api/collections/Sentinel2/search.json?maxRecords=10&startDate=2022-01-01T00%3A00%3A00Z&completionDate=2022-01-09T23%3A59%3A59Z&cloudCover=%5B0%2C20%5D&location=all&processingLevel=LEVEL2A&productType=L2A&sortParam=startDate&sortOrder=descending&status=all&geometry=POLYGON((8.405333680449916+49.27470166786608%2C8.404257822334488+49.33853552890449%2C8.497319549318995+49.33853552890449%2C8.497857478376709+49.275403588302424%2C8.405333680449916+49.27470166786608))&dataset=ESA-DATASET
-    # https://finder.code-de.org/resto/api/collections/Sentinel2/search.json?maxRecords=10&startDate=2022-01-01T00%3A00%3A00Z&completionDate=2022-01-09T23%3A59%3A59Z&cloudCover=%5B0%2C20%5D&location=all&processingLevel=LEVEL2A&productType=L2A&sortParam=startDate&sortOrder=descending&status=all&geometry=POLYGON((8.433843920508753+49.33187542041324%2C8.48548511004929+49.33222597490638%2C8.488174755337859+49.30417372646539%2C8.437071494855036+49.30627819935006%2C8.433843920508753+49.33187542041324))&dataset=ESA-DATASET
     def find(self, collection: str, pretty=True, start_date=None, completion_date=None, processing_level=None,
              aoi=None, show_list=False):
 
@@ -71,6 +66,23 @@ class SentinelIOClient:
             for feature in self.product_list:
                 print(feature['properties']['productIdentifier'])
         return
+
+    def download_product(self, productID, download_path=None, secret_key=None, access_key=None):
+        s3_resource = boto3.resource('s3')
+        if not secret_key:
+            secret_key = self.secret_key
+        if not access_key:
+            access_key = self.access_key
+        bucket = s3_resource.Bucket(BUCKET, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        print(f"Product to be downloaded {productID}")
+        for obj in bucket.objects.filter(Prefix=productID):
+            if not os.path.exists(os.path.dirname(obj.key)):
+                os.makedirs(os.path.dirname(obj.key))
+            if download_path:
+                bucket.download_file(obj.key, download_path)
+            else:
+                bucket.download_file(obj.key, obj.key)  # save to same path
+
 
     @staticmethod
     def read_feature_from_manifest(manifest_file_path, feature_id='measurementFrameSet', tag='coordinates'):
