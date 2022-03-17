@@ -107,10 +107,9 @@ def true_color_img(r_band, g_band, b_band, crs:str, transform, dtype, show=True,
         remove(file_name)
 
 
-def plot_pegel(pegel, save=False, station_name=None, title=None):
+def plot_pegel(pegel_list, save=False, station_name=None, title=None):
     # find x tick subset
-    time_stamps = pegel['timestamp']
-    pegel_values = pegel['Wasserstand [m ü.NN]']
+    time_stamps = pegel_list[0].waterlevel['timestamp']
 
     if len(time_stamps) > 15:
         for i in range(len(time_stamps)):
@@ -133,13 +132,16 @@ def plot_pegel(pegel, save=False, station_name=None, title=None):
         xticks = [hour[0] for hour in hours[:]]
         xtick_loc = [hour[1] for hour in hours[:]]
     fig = pyplot.figure()
-    if station_name:
-        fig.suptitle(f"Pegel: {station_name} from {time_stamps[0][:-9]} to {time_stamps[-1][:-9]}")
-    pyplot.plot(time_stamps, pegel_values, 'rs')
-    pyplot.xticks(xtick_loc, xticks, rotation=90)
-    pyplot.xlabel(pegel.columns[0])
-    pyplot.ylabel(pegel.columns[1])
 
+    fig.suptitle(f"Pegel from {time_stamps[0][:-9]} to {time_stamps[len(time_stamps)-1][:-9]}")
+
+    for i in range(len(pegel_list)):
+        pyplot.plot(time_stamps, pegel_list[i].waterlevel['Wasserstand [m ü.NN]'], label=pegel_list[i].station_name)
+
+    pyplot.xticks(xtick_loc, xticks, rotation=90)
+    pyplot.xlabel(pegel_list[0].waterlevel.columns[0])
+    pyplot.ylabel(pegel_list[0].waterlevel.columns[1])
+    pyplot.legend()
     pyplot.tight_layout()
     pyplot.show()
 

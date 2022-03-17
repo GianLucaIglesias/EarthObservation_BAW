@@ -2,66 +2,64 @@ import requests
 import pandas as pd
 import re
 
-from http_api_utils import dict_from_response_text, make_url_request, append_timestamp
+from http_api_utils import make_url_request, append_timestamp
+from DataPlot import plot_pegel
 
-URL_BASE = r"https://www.pegelonline.wsv.de/webservices/rest-api/v2"
-TEST_URL = URL_BASE + r'/stations.json'
-
+BASE_URL = r"https://www.pegelonline.wsv.de/webservices/rest-api/v2"
+USER_URL = r"https://username:password@www.pegelonline.wsv.de/webservices/nutzer/rest-api/v2"
 
 class PegelIO:
-    def __init__(self, station=None, station_nr=None):
-        make_url_request(TEST_URL)
+    def __init__(self, nutzer=None, passwort=None):
+        self.URL_BASE = BASE_URL.replace('nutzer/', '')
 
-        if station_nr:
-            self.station_name, self.station_nr, coordinates, self.river, self.km = self.load_station(station_nr,
-                                                                                                     number=True)
-        elif station:
-            self.station_name, self.station_nr, coordinates, self.river, self.km = self.load_station(station,
-                                                                                                     number=False)
+        if nutzer and passwort:
+            self.USER_URL = USER_URL.replace('username', nutzer).replace('password', passwort)
         else:
-            self.station_name, self.station_nr, coordinates, self.river, self.km = None, None, (None, None), None, None
+            self.USER_URL = BASE_URL
+            print('No user was set. Data may only be accessible within the last 30 days.')
+        self.stations = []
 
-        self.longitude, self.latitude = coordinates
-        self.measurements = None
-        self.measurements_png = None  # pd.DataFrame(columns=['timestamp','measurement'])
-        self.current_measurement = None
-        self.current_measurement_png = None
+    def fetch_station(self, station_name):
+        for station in self.stations:
+            if station_name.upper() == station.station_name:
+                return station
+        print(f'{station_name} has not been loaded yet.')
+        return None
 
-    @staticmethod
-    def load_station(station, number=False):
+    def load_station(self, station, is_id_number=False):
         """
         Function loading the gauging station supplied by the PegelOnline Service . When given station name was
         found in the list, the meta information is found.
         :param station: either station id number (xxxxxxx) or short name of gauging station as string.
-        :param number: tag whether the given station parameter indicates a number or not
-        :type number: bool
+        :param is_id_number: tag whether the given station parameter indicates a number or not
+        :type is_id_number: bool
         """
-        station_list = requests.get(URL_BASE + '/stations.json').json()
-        if number:
+        station_list = requests.get(self.URL_BASE + '/stations.json').json()
+        if is_id_number:
             id_key = 'number'
-            id_station = str(number)
+            id_station = str(station)
         else:
             id_key = 'shortname'
             id_station = station.upper()
 
         for pegel_station in station_list:
             if pegel_station[id_key].startswith(id_station):
-                print(f"Pegel for {pegel_station[id_key]} has been found. "
-                      f"Number: {pegel_station['number']}, Longname: {pegel_station['longname']}, uuid: {pegel_station['uuid']}")
+                print(f"Pegel {pegel_station[id_key]} has been loaded.")
+                      # f"Number: {pegel_station['number']}, Longname: {pegel_station['longname']}, uuid: {pegel_station['uuid']}")
 
-                station_name = pegel_station['shortname']
-                station_number = str(pegel_station['number'])
-                coordinates = (pegel_station['longitude'], pegel_station['latitude'])
-                km = pegel_station['km']
-                river_name = pegel_station['water']['shortname']
+                station_obj = PegelStation(station_name=pegel_station['shortname'],
+                                           station_number=str(pegel_station['number']),
+                                           coordinate=(pegel_station['longitude'], pegel_station['latitude']),
+                                           km=pegel_station['km'],
+                                           river_name=pegel_station['water']['shortname'])
 
-                return station_name, station_number, coordinates, river_name, km
+                self.stations.append(station_obj)
+                return station_obj
 
         raise ValueError(f'The given gauge ({station}) is not listed in the pegelonline web services. Have a look for '
                          f'all available gauges at: https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json')
 
-    @staticmethod
-    def find_station_around_coordinates(latitude, longitude, radius, show=False):
+    def find_station_around_coordinates(self, latitude, longitude, radius, show=True):
         """
         Looks for gauging station in a certain radius [km] from a geografic location.
         :param latitude: latitude of location of interest
@@ -69,7 +67,7 @@ class PegelIO:
         :param longitude: longitude of location of interest
         :type longitude: float
         """
-        url = URL_BASE + r'/stations.json?latitude=' + str(latitude) + r'&longitude=' +str(longitude) + '&radius=' + \
+        url = self.URL_BASE + r'/stations.json?latitude=' + str(latitude) + r'&longitude=' +str(longitude) + '&radius=' + \
               str(radius)
         response = make_url_request(url)
 
@@ -82,11 +80,10 @@ class PegelIO:
                 print(stations_list[i]['shortname'])
         return stations_list
 
-    @staticmethod
-    def find_station_along_river(river_name, km=None, radius=None, show=False):
-        url = URL_BASE + r'/stations.json?waters=' + river_name.upper()
+    def find_station_along_river(self, river_name, km=None, radius=None, show=True):
+        url = self.URL_BASE + r'/stations.json?waters=' + river_name.upper()
         if km and radius:
-            url += '&km='+ str(km) + '&radius=' + str(radius)
+            url += '&km=' + str(km) + '&radius=' + str(radius)
         response = make_url_request(url)
 
         if type(response.json()) == list:
@@ -98,6 +95,54 @@ class PegelIO:
                 print(stations_list[i]['shortname'])
         return stations_list
 
+    def load_measurement(self, station_names, start=None, end=None, measurement='all'):
+        if type(station_names) == str:
+            if station_names == 'all':
+                station_names = [s.station_name for s in self.stations]
+            else:
+                station_names = [station_names]
+
+        for station_name in station_names:
+            station = self.fetch_station(station_name)
+            if not station:
+                station = self.load_station(station_name)
+
+            if measurement == 'pegel' or measurement == 'all':
+                station.waterlevel = station.load_pegel_for_station(self.USER_URL, start=start, end=end)
+
+            if measurement == 'current' or measurement == 'all' or measurement == 'discharge':
+                station.discharge = station.load_discharge_for_station(self.USER_URL, start=start, end=end)
+            print(f'Measurements loaded for {station_name}.')
+
+    def get_pegel(self, station_name):
+        station = self.fetch_station(station_name)
+        return station.waterlevel
+
+    def get_discharge(self, station_name):
+        station = self.fetch_station(station_name)
+        return station.discharge
+
+    def plot_pegel(self, stations='all'):
+        if stations == 'all':
+            plot_pegel_list = self.stations
+        else:
+            plot_pegel_list = [self.fetch_station(name) for name in stations]
+        plot_pegel(plot_pegel_list)
+
+
+class PegelStation:
+    def __init__(self, station_name, station_number, coordinate, km, river_name):
+        self.station_name = station_name
+        self.station_number = station_number
+        self.longitude, self.latitude = coordinate
+        self.km = km
+        self.river_name = river_name
+
+        self.waterlevel = None
+        self.waterlevel_png = None  # pd.DataFrame(columns=['timestamp','measurement'])
+        self.discharge = None
+        self.discharge_png = None
+
     @staticmethod
     def _load_measurement_from_url(url):
         """
@@ -107,7 +152,11 @@ class PegelIO:
         the start date of the pegel time series
         :type url: str
         """
-        json_resp = make_url_request(url).json()
+        try:
+            json_resp = make_url_request(url).json()
+        except ValueError as err:
+            raise ValueError(err)
+
         if type(json_resp) == list:
             df = pd.DataFrame(json_resp)
         elif type(json_resp) == dict:
@@ -117,24 +166,22 @@ class PegelIO:
                              f"into a pandas dataframe.")
         return df
 
-    def load_current_for_station(self, start=None, end=None):
+    def load_discharge_for_station(self, url_base, start=None, end=None):
         """
-        Set a current measurement inquiry for the given period in time. Returns pandas dataframe with the measured
+        Set a discharge measurement inquiry for the given period in time. Returns pandas dataframe with the measured
         water levels.
         :param start: either timestamp as datetime type or timestamp string lateral in the format
         'yyyy-mm-ddThh:mm+hh:mm' or iso time period (e.g. 'P15D'), indicating the start date of the pegel time series
         :param end: either datetime or timestamp string later in the format 'yyyy-mm-ddThh:mm+hh:mm', indicating
         the end date of the pegel time series
         """
-        url = URL_BASE + '/stations/' + self.station_name + r'/W/currentmeasurement.json'
+        url = url_base + '/stations/' + self.station_name + r'/W/currentmeasurement.json'
         url = append_timestamp(start, end, base_url=url+'?', api='pegel')
 
         df = self._load_measurement_from_url(url)
-        self.current_measurement = df.rename({'value': 'Wasserstand [m ü.NN]'}, axis=1)
+        return df.rename({'value': 'Abfluss [m^3]'}, axis=1)
 
-        return self.current_measurement
-
-    def load_pegel_for_station(self, start=None, end=None, png=False):
+    def load_pegel_for_station(self, url_base, start=None, end=None, png=False):
         """
         Set a pegel inquiry (measurement) for the given period in time. Returns pandas dataframe with the measured water levels.
 
@@ -143,8 +190,7 @@ class PegelIO:
         :param end: either datetime or timestamp string later in the format 'yyyy-mm-ddThh:mm+hh:mm', indicating
         the end date of the pegel time series
         """
-        url = URL_BASE + '/stations/' + self.station_name + r'/W/measurements.json'
+        url = url_base + '/stations/' + self.station_name + r'/W/measurements.json'
         url = append_timestamp(start, end, base_url=url+'?', api='pegel')
         df = self._load_measurement_from_url(url)
-        self.measurements = df.rename({'value': 'Wasserstand [m ü.NN]'}, axis=1)
-        return self.measurements
+        return df.rename({'value': 'Wasserstand [m ü.NN]'}, axis=1)

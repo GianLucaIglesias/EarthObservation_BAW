@@ -44,17 +44,41 @@ from DataPlot import plot_data_array, true_color_img, compare_tiff_files
 
 from Pegel_IO import PegelIO
 from DataPlot import plot_pegel
+from datetime import datetime
 
-pegel = PegelIO('speyer')
-# pegel_speyer = pegel.load_pegel_for_station(start='2021-12-13T09:15:00+01:00', end="2021-12-18T08:15:00+01:00")
+# pegel_io = PegelIO(nutzer='florianlindenberger')
+# PegelIO.load_station('speyer')
 
-# pegel_speyer = pegel.load_pegel_for_station(start='P8D')
+# start = datetime(year=2022, month=3, day=2)
+# end = datetime(year=2022, month=3, day=12)
+# start = 'P8D'  # P15D, P6DT10H15M
+start = 'P10DT0H0M'  # Schreibweise für die vergangenen letzen Tage
+
+# pegel_io = PegelIO(nutzer='florianlindenberger', passwort='BlauesBand3000!')
+pegel_io = PegelIO()
+# pegel_io.find_station_along_river('Rhein')
+
+# pegel_io.load_station('Speyer')
+# pegel_io.load_station('Mainz')
+
+pegel_io.load_measurement(['Speyer', 'Mainz', 'Emmerich'], start=start, end=None, measurement='pegel')  #
+pegel_speyer = pegel_io.get_pegel('speyer')
+discharge_speyer = pegel_io.get_discharge('speyer')
+
+print(f"Pegel Speyer: \n{pegel_speyer}")
+print(f"Discharge Speyer: \n{discharge_speyer}")
+
+pegel_io.plot_pegel()
+
+# pegel_speyer = pegel_io.load_station('speyer')  # nutzer='florianlindenberger'
+# pegel_speyer.load_pegel_for_station(start='P8D')
 # current_speyer = pegel.load_current_for_station(start='P15D')
-
+# pegel_data_speyer = pegel.load_pegel_for_station(start='2021-12-13T09:15:00+01:00', end="2021-12-18T08:15:00+01:00")
+# 'https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/MAINZ/W/measurements.json?start=
 # gauging_station = pegel.find_station_around_coordinates(longitude=13.57, latitude=52.44, radius=20, show=True)
 # gauging_stations_rhein = pegel.find_station_along_river('saale', show=True)
 
-# plot_pegel(pegel_speyer, save=False)
+# plot_pegel(pegel_data_speyer, save=False)
 
 
 

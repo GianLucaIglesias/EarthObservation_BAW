@@ -2,9 +2,6 @@ import pandas as pd
 import os
 from numpy import sum as np_sum
 
-# classifier_dir = r"C:\Users\gian_\Desktop\Vegetationsklassifikation_Wieblingen\Classifier_fusion"
-classifier_dir = r"C:\Users\gian_\Desktop\Vegetationsklassifikation_Wieblingen\Classifier_optical_Kopie"
-
 
 def total_accuracy(cm: pd.DataFrame):
     tot_labels = 0
@@ -25,7 +22,6 @@ def producer_accuracies(cm):
 
     mixed_producer_accuracies = []
     if cm.shape[0] % 2 != 0:
-        print("The mixed Producer Accuracies have not been computed.")
         return class_producer_accuracies, None
 
     for i in range(int(cm.shape[0]/2)):
@@ -43,7 +39,7 @@ def user_accuracies(cm):
         class_user_accuracies.append(correct_labels / all_used_labels)
 
     if cm.shape[0] % 2 != 0:
-        print("The mixed Producer Accuracies have not been computed.")
+        # print("The mixed Producer Accuracies have not been computed.")
         return class_user_accuracies, None
 
     mixed_user_accuracies = []
@@ -55,10 +51,10 @@ def user_accuracies(cm):
     return class_user_accuracies, mixed_user_accuracies
 
 
-def compare_confusion_matrices(directory):
+def compare_confusion_matrices(directory, file_suffix='confusion.csv'):
     csv_file_list = list()
     for f in os.listdir(directory):
-        if f.endswith("confusion.csv"):
+        if f.endswith(file_suffix):
             csv_file_list.append(f)
     print(f"{len(csv_file_list)} csv-files found.\n")
 
@@ -89,7 +85,10 @@ def compare_confusion_matrices(directory):
 # # # # # # # # # # ## # # # # ## # # # # # # # # # # # # # ##  ## # # # # # # # # # # # # # # ## # # # # #
 # # # # # # # # # # ##  Print Results:
 # # # # # # # # # # ## # # # # ## # # # # # # # # # # # # # ##  ## # # # # # # # # # # # # # # ## # # # # #
-
+classifier_dir = r"C:\Users\gian_\Desktop\Vegetationsklassifikation_Wieblingen\Classifier_fusion"
+# classifier_dir = r"C:\Users\gian_\Desktop\Vegetationsklassifikation_Wieblingen\Classifier_optical_Kopie"
+# classifier_dir = r"C:\Users\gian_\Desktop\Vegetationsklassifikation_Wieblingen\Classifier_fusion_3class"
+# classifier_dir = r"C:\Users\gian_\Desktop\Vegetationsklassifikation_Wieblingen\Classifier_radar"
 
 print(f"Directory: {classifier_dir}")
 compare_confusion_matrices(classifier_dir)
