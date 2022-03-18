@@ -38,58 +38,61 @@ from DataPlot import plot_data_array, true_color_img, compare_tiff_files
 
 
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # #    # # # # # # # # # # # # # # # # PEGEL - DEMO - SECTION
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-
-# PEGEL - SECTION
-
-from Pegel_IO import PegelIO
+from Pegel_IO import PegelIO, PegelStation, load_dataframe_from_zip_archive
 from DataPlot import plot_pegel
 from datetime import datetime
 
 # pegel_io = PegelIO(nutzer='florianlindenberger')
 # PegelIO.load_station('speyer')
 
-# start = datetime(year=2022, month=3, day=2)
-# end = datetime(year=2022, month=3, day=12)
-# start = 'P8D'  # P15D, P6DT10H15M
-start = 'P10DT0H0M'  # Schreibweise für die vergangenen letzen Tage
+start = datetime(year=2021, month=3, day=2)
+end = datetime(year=2022, month=3, day=12)
+# start = 'P15D'  # P15D, P6DT10H15M
+# start = 'P40DT0H0M'  # Schreibweise für die vergangenen letzen Tage
 
-# pegel_io = PegelIO(nutzer='florianlindenberger', passwort='BlauesBand3000!')
-pegel_io = PegelIO()
+pegel_io = PegelIO(nutzer='florianlindenberger', passwort='BlauesBand3000!')
+
 # pegel_io.find_station_along_river('Rhein')
+# pegel_io.find_station_around_coordinates(longitude=13.57, latitude=52.44, radius=20, show=True)
 
-# pegel_io.load_station('Speyer')
-# pegel_io.load_station('Mainz')
+# pegel_io.show_accessible_time_series()
 
-pegel_io.load_measurement(['Speyer', 'Mainz', 'Emmerich'], start=start, end=None, measurement='pegel')  #
-pegel_speyer = pegel_io.get_pegel('speyer')
-discharge_speyer = pegel_io.get_discharge('speyer')
+pegel_speyer = pegel_io.load_station('SPEYER')
+# pegel_io.load_measurement(['Speyer', 'Mainz', 'Emmerich'], start=start, end=None, measurement='pegel')
+# pegel_io.plot_pegel(['Speyer', 'Mainz', 'Emmerich'])
+pegel_speyer.load_waterlevel_measurement(start=start)
 
-print(f"Pegel Speyer: \n{pegel_speyer}")
-print(f"Discharge Speyer: \n{discharge_speyer}")
+# discharge_speyer = pegel_io.get_discharge('speyer')
+# print(pegel_speyer.waterlevel)
 
-pegel_io.plot_pegel()
-
-# pegel_speyer = pegel_io.load_station('speyer')  # nutzer='florianlindenberger'
-# pegel_speyer.load_pegel_for_station(start='P8D')
-# current_speyer = pegel.load_current_for_station(start='P15D')
-# pegel_data_speyer = pegel.load_pegel_for_station(start='2021-12-13T09:15:00+01:00', end="2021-12-18T08:15:00+01:00")
-# 'https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/MAINZ/W/measurements.json?start=
-# gauging_station = pegel.find_station_around_coordinates(longitude=13.57, latitude=52.44, radius=20, show=True)
-# gauging_stations_rhein = pegel.find_station_along_river('saale', show=True)
-
-# plot_pegel(pegel_data_speyer, save=False)
+pegel_speyer = PegelStation('SPEYER')
 
 
+waterlevel_archive = r"C:\Users\gian_\Downloads\W_O_cm_23700600_2016_03_01_2018_03_17.zip" #doesn't work with r"C:\Users\gian_\Downloads\W_O_cm_23700600_2021_09_18_2022_03_18.zip"
+discharge_archive = r"C:\Users\gian_\Downloads\Q_O_m³_s_23700600_2016_03_14_2022_03_18.zip"
+# pegel_speyer.load_timeseries_from_zip(waterlevel_archive, start=start.isoformat(), end=end.isoformat())
+pegel_speyer.load_timeseries_from_zip(discharge_archive, start=start.isoformat(), end=end.isoformat())
 
+max_discharge = pegel_speyer.get_maximum_discharge()
+# pegel_speyer.get_maximum_water_level()
 
+plot_pegel([pegel_speyer], measure='discharge')
 
-
+# pegel_speyer.load_pegel_timeseries(start=start)
 
 
 
-
-
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # #    # # # # # # # # # # # # # # # # PEGEL - DEMO - SECTION - END
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
 
@@ -105,10 +108,10 @@ pegel_io.plot_pegel()
 
 # sentinel_1 = S1_RasterData().load_from_tiff(file_path=r'D:\SAR\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B.SAFE\measurement\s1a-iw-grd-vh-20210927t053448-20210927t053513-039863-04b74d-002.tiff')
 
-file_name = r'D:\SAR\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B.SAFE\measurement\s1a-iw-grd-vh-20210927t053448-20210927t053513-039863-04b74d-002.tiff'
-bigS2_scene = r'C:\Users\gian_\Desktop\Masterarbeit\SENTINEL2A_20210906-103717-884_L2A_T32UMV_C_V1-0\SENTINEL2A_20210906-103717-884_L2A_T32UMV_C_V1-0\SENTINEL2A_20210906-103717-884_L2A_T32UMV_C_V1-0_QKL_ALL.tiff'
-cloud_filesystem = r'C:\Users\gian_\Desktop\Masterarbeit\CODE-DE\SENTINEL2B_20210921-103714-671_L2A_T32UMV_C_V1-0\SENTINEL2B_20210921-103714-671_L2A_T32UMV_C_V1-0\DATA\SENTINEL2B_20210921-103714-671_L2A_T32UMV_C_V1-0_PVD_ALL'
-cloud_file = r'CLD.tif'
+# file_name = r'D:\SAR\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B\S1A_IW_GRDH_1SDV_20210927T053448_20210927T053513_039863_04B74D_943B.SAFE\measurement\s1a-iw-grd-vh-20210927t053448-20210927t053513-039863-04b74d-002.tiff'
+# bigS2_scene = r'C:\Users\gian_\Desktop\Masterarbeit\SENTINEL2A_20210906-103717-884_L2A_T32UMV_C_V1-0\SENTINEL2A_20210906-103717-884_L2A_T32UMV_C_V1-0\SENTINEL2A_20210906-103717-884_L2A_T32UMV_C_V1-0_QKL_ALL.tiff'
+# cloud_filesystem = r'C:\Users\gian_\Desktop\Masterarbeit\CODE-DE\SENTINEL2B_20210921-103714-671_L2A_T32UMV_C_V1-0\SENTINEL2B_20210921-103714-671_L2A_T32UMV_C_V1-0\DATA\SENTINEL2B_20210921-103714-671_L2A_T32UMV_C_V1-0_PVD_ALL'
+# cloud_file = r'CLD.tif'
 
 #
 # app = otb.Registry.CreateApplication("Smoothing")

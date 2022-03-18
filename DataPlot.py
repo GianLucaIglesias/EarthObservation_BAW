@@ -107,40 +107,42 @@ def true_color_img(r_band, g_band, b_band, crs:str, transform, dtype, show=True,
         remove(file_name)
 
 
-def plot_pegel(pegel_list, save=False, station_name=None, title=None):
+def plot_pegel(pegel_list, measure, save=False, station_name=None, title=None):
     # find x tick subset
-    time_stamps = pegel_list[0].waterlevel['timestamp']
 
-    if len(time_stamps) > 15:
-        for i in range(len(time_stamps)):
-            day = time_stamps[i][0:10]
-            hour = time_stamps[i][-14:-9]
-
-            if not 'days' in locals():
-                days = [(day, i)]
-                hours = [(hour, i)]
-            elif day != days[-1][0]:
-                days.append((day, i))
-
-            if hour != hours[-1][0] and hour[-2:] == '00':
-                hours.append((hour, i))
-
-    if len(days) > 1:
-        xticks = [day[0] for day in days[:]]
-        xtick_loc = [day[1] for day in days[:]]
+    if measure == 'waterlevel':
+        value_name = pegel_list[0].waterlevel.columns[-1]
+        time_stamps = pegel_list[0].waterlevel['timestamp']
+    elif measure == 'discharge':
+        value_name = pegel_list[0].discharge.columns[-1]
+        time_stamps = pegel_list[0].discharge['timestamp']
     else:
-        xticks = [hour[0] for hour in hours[:]]
-        xtick_loc = [hour[1] for hour in hours[:]]
+        print("Plot couldn't be created. Choose one of the allowed measures [waterlevel, discharge]")
+        exit()
+
+    if len(time_stamps) > 10:
+        for i in range(len(time_stamps)):
+            xticks = [time_stamps.iloc[i*int(len(time_stamps)/10)] for i in range(10)]
+            xtick_loc = [i*int(len(time_stamps)/10) for i in range(10)]
+    else:
+        xticks = list(time_stamps)
+        xtick_loc = [i for i in range(len(time_stamps))]
+
     fig = pyplot.figure()
 
-    fig.suptitle(f"Pegel from {time_stamps[0][:-9]} to {time_stamps[len(time_stamps)-1][:-9]}")
+    fig.suptitle(f"Pegel from {time_stamps.iloc[0][:-9]} to {time_stamps.iloc[len(time_stamps)-1][:-9]}")
 
     for i in range(len(pegel_list)):
-        pyplot.plot(time_stamps, pegel_list[i].waterlevel['Wasserstand [m ü.NN]'], label=pegel_list[i].station_name)
+        if measure == 'waterlevel':
+            data_values = pegel_list[i].waterlevel[value_name]
+        elif measure == 'discharge':
+            data_values = pegel_list[i].discharge[value_name]
+
+        pyplot.plot(time_stamps, data_values, label=pegel_list[i].station_name)
 
     pyplot.xticks(xtick_loc, xticks, rotation=90)
-    pyplot.xlabel(pegel_list[0].waterlevel.columns[0])
-    pyplot.ylabel(pegel_list[0].waterlevel.columns[1])
+    pyplot.xlabel('time')
+    pyplot.ylabel(value_name)
     pyplot.legend()
     pyplot.tight_layout()
     pyplot.show()

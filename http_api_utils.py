@@ -156,7 +156,7 @@ def append_timestamp(start=None, end=None, base_url='', measurement_interval=Non
                         date += 'T00:00:00+' + measurement_interval
             elif date in iso_standard_periods:
                 pass
-            elif api == 'pegel' and (date[0] == 'P' and date[-1] == 'M'):
+            elif api == 'pegel' and (date[0] == 'P' and (date[-1] in 'M', 'H', 'D')):
                 pass  # P10D5H20M - Format
             else:
                 raise ValueError(f'A time stamp has to follow iso RFC-3339 standard: '
