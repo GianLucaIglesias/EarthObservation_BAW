@@ -1,5 +1,5 @@
 from os import remove
-
+from numpy import linspace, arange, nan
 import rasterio
 import rasterio.plot as rplot
 import matplotlib.pyplot as pyplot
@@ -128,19 +128,30 @@ def plot_pegel(pegel_list, measure, save=False, station_name=None, title=None):
         xticks = list(time_stamps)
         xtick_loc = [i for i in range(len(time_stamps))]
 
+    min_value, max_value = 500, 0
+
     fig = pyplot.figure()
-
     fig.suptitle(f"Pegel from {time_stamps.iloc[0][:-9]} to {time_stamps.iloc[len(time_stamps)-1][:-9]}")
-
     for i in range(len(pegel_list)):
         if measure == 'waterlevel':
-            data_values = pegel_list[i].waterlevel[value_name]
+            data_values = list(map(int, pegel_list[i].waterlevel[value_name]))
         elif measure == 'discharge':
-            data_values = pegel_list[i].discharge[value_name]
+            data_values = list(map(float, pegel_list[i].discharge[value_name]))
+        # filter for nan values
+        for j in range(len(data_values)):
+            if data_values[j] == -777:
+                data_values[j] = nan
 
         pyplot.plot(time_stamps, data_values, label=pegel_list[i].station_name)
 
-    pyplot.xticks(xtick_loc, xticks, rotation=90)
+        # data_values = list(filter((-777).__ne__, data_values))
+        if min(data_values) < min_value:
+            min_value = min(data_values)
+        if max(data_values) > max_value:
+            max_value = max(data_values)
+
+    pyplot.xticks(xtick_loc, xticks, rotation=75)
+    # pyplot.yticks(ytick_loc, y_ticks)
     pyplot.xlabel('time')
     pyplot.ylabel(value_name)
     pyplot.legend()

@@ -71,19 +71,20 @@ pegel_speyer.load_waterlevel_measurement(start=start)
 # discharge_speyer = pegel_io.get_discharge('speyer')
 # print(pegel_speyer.waterlevel)
 
-pegel_speyer = PegelStation('SPEYER')
-
+# pegel_speyer = PegelStation('SPEYER')
 
 waterlevel_archive = r"C:\Users\gian_\Downloads\W_O_cm_23700600_2016_03_01_2018_03_17.zip" #doesn't work with r"C:\Users\gian_\Downloads\W_O_cm_23700600_2021_09_18_2022_03_18.zip"
-discharge_archive = r"C:\Users\gian_\Downloads\Q_O_m³_s_23700600_2016_03_14_2022_03_18.zip"
-# pegel_speyer.load_timeseries_from_zip(waterlevel_archive, start=start.isoformat(), end=end.isoformat())
-pegel_speyer.load_timeseries_from_zip(discharge_archive, start=start.isoformat(), end=end.isoformat())
+discharge_archive = r"C:\Users\gian_\Desktop\Q_O_m³_s_23700600_2016_03_14_2022_03_18.zip"
+# pegel_speyer.load_timeseries_from_zip(waterlevel_archive, start=start, end=end)
+pegel_speyer.load_timeseries_from_zip(discharge_archive, start=start, end=end)
+# plot_pegel([pegel_speyer], measure='discharge')
 
 max_discharge = pegel_speyer.get_maximum_discharge()
 # pegel_speyer.get_maximum_water_level()
 
-plot_pegel([pegel_speyer], measure='discharge')
 
+
+# plot_pegel([pegel_speyer], measure='waterlevel')
 # pegel_speyer.load_pegel_timeseries(start=start)
 
 

@@ -1,7 +1,29 @@
 import requests
 import re
+import wget
+from os import path as os_path
+from datetime import datetime, timedelta
+from datetime import date as date_typ
 
-from datetime import datetime
+
+## Project: iAI   Author: aimuch   File: yolov3_to_onnx.py    License: MIT License
+def download_file(local_path, link):
+    """Checks if a local file is present and downloads it from the specified path otherwise.
+    If checksum_reference is specified, the file's md5 checksum is compared against the
+    expected value.
+
+    Keyword arguments:
+    local_path -- path of the file whose checksum shall be generated
+    link -- link where the file shall be downloaded from if it is not found locally
+    """
+    if not os_path.exists(local_path):
+        print(f"Downloading from {link} to {local_path}..")
+        wget.download(link, local_path) # wget --http-user="ihr_login" --http-password="ihr_passwort" --no-check-certificate "https://pegelonline.wsv.de/webservices/nutzer/files/testdatei.txt"
+        return local_path
+
+    else:
+        print(f"File not downloaded. The target already exists: {local_path}")
+        return
 
 
 def make_url_request(url: str):
@@ -59,15 +81,15 @@ def append_aoi(url, lower_left, upper_right):
 
     coordinates = [(lower_left[0], lower_left[1]), (lower_left[0], upper_right[1]), (upper_right[0], upper_right[1]),
                    (upper_right[0], lower_left[1])]
-
     for i in range(len(coordinates)):
         aoi_str += str(coordinates[i][0]) + '+' + str(coordinates[i][1]) + '%2C'
-
-
     aoi_str += str(coordinates[0][0]) + '+' + str(coordinates[0][1]) + '))'
+    return aoi_str
 
-        # geometry=POLYGON((8.433843920508753+49.33187542041324%2C8.48548511004929+49.33222597490638%2C8.488174755337859+49.30417372646539%2C8.437071494855036+49.30627819935006%2C8.433843920508753+49.33187542041324))
-        # geometry=POLYGON((8.405333680449916+49.27470166786608%2C8.404257822334488+49.33853552890449%2C8.497319549318995+49.33853552890449%2C8.497857478376709+49.275403588302424%2C8.405333680449916+49.27470166786608))
+# https://finder.code-de.org/resto/api/collections/Sentinel1/search.json?maxRecords=10&location=all&productType=GRD&processingLevel=LEVEL1&sensorMode=IW&sortParam=startDate&sortOrder=descending&status=all&geometry=POINT(8.570969624999998+49.42216920772617)&dataset=ESA-DATASET
+def append_point(url, lon, lat):
+    aoi_str = url.strip('&') + '&geometry=POINT('
+    aoi_str += str(lon) + '+' + str(lat) + ')'
     return aoi_str
 
 
@@ -118,27 +140,33 @@ def append_timestamp(start=None, end=None, base_url='', measurement_interval=Non
         else:
             continue
 
-        if type(date) == datetime:
-
+        if type(date) == date_typ or type(date) == datetime:
+# https://finder.code-de.org/resto/api/collections/Sentinel1/search.json?maxRecords=10&startDate=2022-03-02T00%3A00%3A00Z&completionDate=2022-03-14T23%3A59%3A59Z&location=all&productType=GRD&processingLevel=LEVEL1&sensorMode=IW&sortParam=startDate&sortOrder=descending&status=all&geometry=POINT(8.570969624999998+49.42216920772617)&dataset=ESA-DATASET
             if api == 'code-de':
-                date_list = [('year', date.year), ('month', date.month), ('day', date.day)]
-                time_list = [('hour', date.hour), ('minute', date.minute), ('second', date.second)]
-
+                if type(date) == datetime:
+                    date_list = [('year', date.year), ('month', date.month), ('day', date.day)]
+                    time_list = [('hour', date.hour), ('minute', date.minute), ('second', date.second)]
+                if type(date) == date_typ:
+                    date_list = [('year', date.year), ('month', date.month), ('day', date.day)]
+                    time_list = [('hour', 0), ('minute', 0), ('second', 0)]
+# startDate=2022-03-02T00%3A00%3A00Z
+# startDate=2021-03-02T00:00:0Z
+            # 'https://finder.code-de.org/resto/api/collections/Sentinel2/search.json?&processingLevel=LEVEL1C&startDate=2021-3-2:0:0:0Z&completionDate=2022-3-12:0:0:0Z&geometry=POINT(6.7+49.5)'
                 for i_date in range(len(date_list)):
                     if date_list[i_date]:
                         if not i_date == 0:
                             inquiry_url += '-'
-                        inquiry_url += str(date_list[i_date][1])
+                        inquiry_url += str(date_list[i_date][1]).zfill(2)
                     else:
                         raise ValueError(f'The date requires the statement of a {date_list[i_date][0]} ')
 
                 for i_time in range(len(time_list)):
+                    if i_time == 0:
+                        inquiry_url += 'T'
+                    else:
+                        inquiry_url += '%3A'
                     if time_list[i_time]:
-                        if i_date == 0:
-                            inquiry_url += 'T'
-                        else:
-                            inquiry_url += ':'
-                        time_str = str(time_list[i_time][1])
+                        time_str = str(time_list[i_time][1]).zfill(2)
                     else:
                         time_str = '00'
                     inquiry_url += time_str
@@ -146,7 +174,6 @@ def append_timestamp(start=None, end=None, base_url='', measurement_interval=Non
 
             elif api == 'pegel':
                 inquiry_url += date.isoformat() + '+' + measurement_interval
-
 
         elif type(date) == str:
             # general format check
@@ -169,3 +196,13 @@ def append_timestamp(start=None, end=None, base_url='', measurement_interval=Non
             inquiry_url = base_url
 
     return inquiry_url
+
+
+def get_date_time_from_iso_timestamp(ts, days_tolerance=0):
+    date_time = date_typ.fromisoformat(ts[:10])
+    if days_tolerance > 0:
+        end = date_time + timedelta(days=days_tolerance)
+        start = date_time - timedelta(days=days_tolerance)
+    else:
+        start, end = date_time, None
+    return start, end

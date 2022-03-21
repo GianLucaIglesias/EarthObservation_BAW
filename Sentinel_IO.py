@@ -9,7 +9,7 @@ from pyproj import Transformer
 from os import remove as remove_file
 from geometry_utils import point_in_bounding_box
 from sentinel_io_utils import API_Error
-from http_api_utils import append_directory, append_search_parameter, append_aoi, append_timestamp, make_url_request
+from http_api_utils import append_directory, append_search_parameter, append_aoi, append_point, append_timestamp, make_url_request
 
 # Define repository
 HOST = 'http://data.cloud.code-de.org'
@@ -29,9 +29,11 @@ class SentinelIOClient:
 
         if '1' in str(collection):
             collection = 'Sentinel1'
-
+            processing_level = 'LEVEL1'
         elif '2' in str(collection):
             collection = 'Sentinel2'
+            if processing_level == 1:
+                processing_level = 'LEVEL1C'
             if processing_level == 2:
                 processing_level = 'LEVEL2A'
         else:
@@ -43,18 +45,23 @@ class SentinelIOClient:
         #     finder_URL = append_search_parameter(finder_URL, ('_pretty', 'true'))
 
         if processing_level:
-            finder_URL = append_search_parameter(finder_URL + '&', ('processingLevel', 'LEVEL2A'))
+            finder_URL = append_search_parameter(finder_URL + '&', ('processingLevel', processing_level))
 
         if start_date or completion_date:
             finder_URL = append_timestamp(start=start_date, end=completion_date,
                                           base_url=finder_URL + '&', api='code-de')
 
         if aoi:
-            if type(aoi) != list and len(aoi) != 2:
-                raise ValueError('The aoi has to be a list of the upper left and bottom right coordinate of a bounding '
-                                 'box. e.g: [(49.34067, 8.41330), (49.26702, 8.50788)]')
+            if type(aoi) == tuple:
+                if aoi[0] > aoi[1]:
+                    print("Please make sure the coordinates are stated as: (longitud,latitude)")
+                finder_URL = append_point(finder_URL + '&', aoi[0], aoi[1])
 
-            finder_URL = append_aoi(finder_URL + '&', lower_left=aoi[0], upper_right=aoi[1])
+            if type(aoi) == list:
+                if not len(aoi) == 2:
+                    raise ValueError('The aoi has to be a list of the upper left and bottom right coordinate of a '
+                                     'bounding box in epsg:4236 Coordinates e.g: [(8.41330, 49.34067), (8.50788,49.26702)]')
+                finder_URL = append_aoi(finder_URL + '&', lower_left=aoi[0], upper_right=aoi[1])
 
         finder_dict = make_url_request(finder_URL).json()
         if finder_dict['type'] == 'FeatureCollection':

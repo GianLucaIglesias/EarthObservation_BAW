@@ -1,13 +1,16 @@
+import datetime
+import zipfile
+
 import requests
 import pandas as pd
 from zipfile import ZipFile
 
-from http_api_utils import make_url_request, append_timestamp
+from http_api_utils import make_url_request, append_timestamp, download_file
 from DataPlot import plot_pegel
 
 BASE_URL = r"https://www.pegelonline.wsv.de/webservices/rest-api/v2"
 USER_URL = r"https://username:password@www.pegelonline.wsv.de/webservices/nutzer/rest-api/v2"
-
+USER_FILE = r"https://username:password@www.pegelonline.wsv.de/webservices/nutzer/files"
 
 def _is_iso_format(ts):
     if type(ts) == str:
@@ -27,10 +30,13 @@ def load_dataframe_from_zip_archive(archive_path):
 
     abo_name = archive_path.split('\\')[-1][:-4]
     data_file = abo_name + ".dat"
-    print(f"Reading {data_file}")
-
-    with ZipFile(archive_path, 'r') as zip:
-        data_file_str = zip.read(data_file).decode()
+    print(f"Try to read from {archive_path}\\{data_file}")
+    try:
+        with ZipFile(archive_path, 'r') as zip:
+            data_file_str = zip.read(data_file).decode()
+    except zipfile.BadZipfile:
+        print("The Zip-File can't be opened. Seems like the file is damaged.")
+        exit()
 
     data_file_lines = data_file_str.split('\r\n')
     c_name = data_file_lines[1].split('|CNAME')[1][0]
@@ -54,6 +60,20 @@ def load_dataframe_from_zip_archive(archive_path):
     elif measurement == 'waterlevel':
         df = pd.DataFrame({'timestamp': timestamps, f"Wasserstand [{unit}]": values})
     return df, measurement
+
+
+# def write_bytes_to_zipfile(file_name, bytes_content):
+    # print(f"Writing {file_name}...")
+    # zip_archive = ZipFile(file_name, 'w')
+    # data_file = file_name.split('\\')[-1].rstrip('zip') + 'dat'
+    # zip_archive.write(data_file)
+    # zip_archive.close()
+
+    # Filling it with bytes content??
+    # with ZipFile(zip_archive + '\\' + file_name, 'w') as zip_file:
+    #         zip_file.write(bytes_content)
+    #     zip_archive.close()
+
 
 
 def _load_dataframe_from_url(url):
@@ -239,23 +259,22 @@ class PegelStation:
         return self.waterlevel
 
     def get_maximum_water_level(self):
-        col_name = self.waterlevel.columns[1]
-        max_waterlevel = self.waterlevel[col_name].max()
-        max_df = self.waterlevel.loc[self.waterlevel[col_name] == max_waterlevel]
-        print(f"{len(max_df)} maximal discharges have been found.")
-        print(max_df)
-        return max_df
+        if type(self.waterlevel) == pd.DataFrame:
+            max_waterlevel = self.waterlevel.max()
+            print(f"Maximaler {self.waterlevel.columns[1]} gefunden am {max_waterlevel[0]}: \n{max_waterlevel[1]}")
+            return max_waterlevel
+        else:
+            print("No discharge waterlevel have been loaded yet.")
 
     def get_maximum_discharge(self):
-        col_name = self.discharge.columns[1]
-        max_discharge = self.discharge[col_name].max()
-        max_df = self.discharge.loc[self.discharge[col_name] == max_discharge]
-        print(f"{len(max_df)} maximal discharges have been found.")
-        print(max_df)
-        return max_df
+        if type(self.discharge) == pd.DataFrame:
+            max_discharge = self.discharge.max()
+            print(f"Maximaler {self.discharge.columns[1]} gefunden am {max_discharge[0]}: \n{max_discharge[1]}")
+            return max_discharge
+        else:
+            print("No discharge measurements have been loaded yet.")
 
     def get_discharge(self):
-
         return self.discharge
 
     def load_discharge_measurement(self, start=None, end=None):
@@ -288,6 +307,25 @@ class PegelStation:
         self.waterlevel = df.rename({'value': 'Wasserstand [m ü.NN]'}, axis=1)
         return self.waterlevel
 
+    # def download_timeseries_from_abo(self, abo="Q_O_m³_s_23700600_2016_03_14_2022_03_18.zip",
+    #                              login='florianlindenberger', passwort='BlauesBand3000!',
+    #                              local_path=r"C:\Users\gian_\Downloads", local_file_name=None):
+    # Method is not yet useable:
+        # 1. )  download with wget doesn't accept user and password in url
+        # 2. )  didn't manage to write bytes from simple get request (response.content) to a local zip archive
+
+    #     if local_file_name:
+    #         download_archive = local_path + '\\' + local_file_name
+    #     else:
+    #         download_archive = local_path + '\\' + abo
+    #
+    #     url = USER_FILE.replace('username', login).replace('password', passwort) + '/' + abo
+    #     response = make_url_request(url)
+        # if response.ok:
+        #     # write_bytes_to_zipfile(abo.strip('zip') + 'dat', download_archive, response.content)
+        #     write_bytes_to_zipfile(download_archive, response.content)
+            # print(f"Download successful: Check your local download directory for: {abo}")
+
     def load_timeseries_from_zip(self, archive_path, start=None, end=None, png=False):
         """
         Set a pegel inquiry (measurement) for the given period in time. Returns pandas dataframe with the measured water levels.
@@ -302,26 +340,38 @@ class PegelStation:
         except ValueError as err:
             print(f"Could not load time series for {self.station_name} because of error: \n{err}")
             exit(0)
+        if type(start) == datetime.datetime:
+            start = start.isoformat()
+        if type(end) == datetime.datetime:
+            end = end.isoformat()
 
         if _is_iso_format(start):
             if start[-8:] == "00:00:00":
                 start = start[:-5] + "15:00"
-            start_idx = df.loc[df['timestamp'] == start].index[0]
+            try:
+                start_idx = df.loc[df['timestamp'] == start].index[0]
+            except IndexError:
+                start_idx = 0
         else:
-            start_idx = 0
+            print("The start date could not be interpreted. No data load from zip archive. ")
 
         if _is_iso_format(end):
             if end[-8:] == "00:00:00":
                 end = end[:-5] + "15:00"
-            end_idx = df.loc[df['timestamp'] == end].index[0]
-        else:
-            end_idx = len(df)
+            try:
+                end_idx = df.loc[df['timestamp'] == end].index[0]
+            except IndexError:
+                end_idx = len(df) - 1
 
         if measurement == 'waterlevel':
             print(f"Waterlevels have been loaded for pegel {self.station_name}.")
-            self.waterlevel = df.iloc[start_idx:end_idx-1]
+            waterlevel_string_data = df.iloc[start_idx:end_idx]
+            data_types_dict = {waterlevel_string_data.columns[1]: float}
+            self.waterlevel = waterlevel_string_data.astype(data_types_dict)
         elif measurement == 'discharge':
             print(f"Discharge measurements have been loaded for pegel {self.station_name}.")
-            self.discharge = df.iloc[start_idx:end_idx - 1]
+            discharge_string_data = df.iloc[start_idx:end_idx]
+            data_types_dict = {discharge_string_data.columns[1]: int}
+            self.discharge = discharge_string_data.astype(data_types_dict)
         else:
             print("Measurements could not be loaded from df due to unknown measurement type.")
